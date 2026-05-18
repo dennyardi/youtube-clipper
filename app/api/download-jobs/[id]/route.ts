@@ -19,6 +19,9 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     status: job.status,
     progressText: job.progressText,
     errorMessage: job.errorMessage,
-    downloadUrl: job.status === "COMPLETED" && job.filePath && fs.existsSync(job.filePath) ? `/api/download-jobs/${job.id}/file` : null,
+    downloadUrl:
+      job.status === "COMPLETED" && (job.storageKey || (job.filePath && fs.existsSync(job.filePath)))
+        ? `/api/download-jobs/${job.id}/file`
+        : null,
   });
 }

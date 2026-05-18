@@ -24,6 +24,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       progressText: true,
       errorMessage: true,
       filePath: true,
+      storageKey: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -32,7 +33,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   return NextResponse.json(
     jobs.map((job) => ({
       ...job,
-      downloadUrl: job.status === "COMPLETED" && job.filePath ? `/api/download-jobs/${job.id}/file` : null,
+      downloadUrl: job.status === "COMPLETED" && (job.filePath || job.storageKey) ? `/api/download-jobs/${job.id}/file` : null,
     })),
   );
 }

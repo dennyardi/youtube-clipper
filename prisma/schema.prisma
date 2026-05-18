@@ -122,6 +122,10 @@ model DownloadJob {
   progressText String?          @db.Text
   errorMessage String?          @db.Text
   filePath    String?           @db.Text
+  storageKey  String?           @db.Text
+  storageBucket String?         @db.Text
+  storageProvider String?       @db.Text
+  uploadedAt  DateTime?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
