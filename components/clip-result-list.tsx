@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Download, Save } from "lucide-react";
 import { YoutubePreview } from "@/components/youtube-preview";
 import { secondsToClock } from "@/lib/time";
@@ -38,7 +38,46 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
     message?: string;
     error?: string;
   } | null>(null);
+  const [recentJobs, setRecentJobs] = useState<Array<{
+    id: string;
+    type: string;
+    mode: string;
+    status: string;
+    progressText: string | null;
+    errorMessage: string | null;
+    downloadUrl: string | null;
+  }>>([]);
   const totalDuration = items.reduce((sum, clip) => sum + Math.max(0, clip.endSecond - clip.startSecond), 0);
+
+  useEffect(() => {
+    let stopped = false;
+
+    async function loadJobs() {
+      try {
+        const response = await fetch(`/api/analysis/${analysisId}/download-jobs`, { cache: "no-store" });
+        const data = await response.json();
+        if (!stopped && Array.isArray(data)) setRecentJobs(data);
+      } catch {
+        if (!stopped) setRecentJobs([]);
+      }
+    }
+
+    loadJobs();
+    const timer = window.setInterval(loadJobs, 5000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [analysisId]);
+
+  async function readJsonSafe(response: Response) {
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { error: text.slice(0, 500) || `HTTP ${response.status}` };
+    }
+  }
 
   async function updateClip(id: string, startSecond: number, endSecond: number) {
     setBusy(id);
@@ -88,20 +127,21 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
 
   async function downloadClip(id: string) {
     setBusy(id);
+    setDownloadStatus({ target: id, status: "CREATING", message: "Membuat job download clip..." });
     const response = await fetch(`/api/clips/${id}/download`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode: cutMode, burnSubtitle }),
     });
-    const data = await response.json();
+    const data = await readJsonSafe(response);
 
     if (!response.ok) {
       setBusy(null);
       setDownloadStatus({ status: "FAILED", message: "Gagal membuat job download.", error: data.error || "Gagal mengunduh clip." });
-      alert(data.error || "Gagal mengunduh clip.");
       return;
     }
 
+    setDownloadStatus({ jobId: data.jobId, target: id, status: "PENDING", message: "Job download dibuat. Menunggu antrean..." });
     waitForJob(data.jobId);
   }
 
@@ -109,17 +149,17 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
     const legacy = id.startsWith("legacy-");
     const realId = legacy ? id.replace("legacy-", "") : id;
     setBusy(id);
+    setDownloadStatus({ target: id, status: "CREATING", message: "Membuat job download hook/teaser..." });
     const response = await fetch(legacy ? `/api/clips/${realId}/hook-download` : `/api/hooks/${id}/download`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode: cutMode, burnSubtitle }),
     });
-    const data = await response.json();
+    const data = await readJsonSafe(response);
 
     if (!response.ok) {
       setBusy(null);
       setDownloadStatus({ status: "FAILED", message: "Gagal membuat job download hook.", error: data.error || "Gagal mengunduh hook/teaser." });
-      alert(data.error || "Gagal mengunduh hook/teaser.");
       return;
     }
 
@@ -188,6 +228,30 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
           <div className="mt-1">{downloadStatus.message}</div>
           {downloadStatus.error && <div className="mt-1 font-medium">{downloadStatus.error}</div>}
           {downloadStatus.jobId && <div className="mt-1 text-xs opacity-80">Job ID: {downloadStatus.jobId}</div>}
+        </div>
+      )}
+      {!!recentJobs.length && (
+        <div className="rounded-lg border border-line bg-white p-4 text-sm shadow-soft">
+          <div className="mb-3 font-semibold">Riwayat Download Terbaru</div>
+          <div className="space-y-2">
+            {recentJobs.map((job) => (
+              <div key={job.id} className="rounded-md border border-line bg-panel px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-medium">
+                    {job.type} - {job.mode} - {job.status}
+                  </div>
+                  {job.downloadUrl && (
+                    <a className="text-brand hover:text-blue-700" href={job.downloadUrl}>
+                      Unduh File
+                    </a>
+                  )}
+                </div>
+                <div className="mt-1 text-muted">{job.progressText || "Menunggu status..."}</div>
+                {job.errorMessage && <div className="mt-1 font-medium text-red-700">{job.errorMessage}</div>}
+                <div className="mt-1 text-xs text-muted">Job ID: {job.id}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {items.map((clip, index) => (
