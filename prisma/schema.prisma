@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Setting {
+  id           Int          @id @default(1)
+  openaiApiKeyEnc String?   @db.Text
+  openaiModel  String       @default("gpt-5.2")
+  analysisMode AnalysisMode @default(HYBRID)
+  maxAiCandidates Int       @default(40)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model PromptPreset {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?  @db.Text
+  prompt      String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  analyses Analysis[]
+}
+
+model Analysis {
+  id             String         @id @default(cuid())
+  youtubeUrl     String         @db.Text
+  videoId        String
+  videoTitle     String?        @db.Text
+  type           AnalysisType
+  language       String
+  targetDuration Int
+  minClipCount   Int
+  hookCount      Int            @default(1)
+  minDurationSec Int?
+  maxDurationSec Int?
+  nicheFocus      String?        @db.Text
+  nicheMinDurationSec Int?
+  nicheMaxDurationSec Int?
+  nicheAnalysis   String?        @db.Text
+  presetId       Int?
+  analysisMode   AnalysisMode
+  status         AnalysisStatus @default(PENDING)
+  progress       Int            @default(0)
+  progressText   String?        @db.Text
+  errorMessage   String?        @db.Text
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  preset PromptPreset? @relation(fields: [presetId], references: [id], onDelete: SetNull)
+  clips  ClipResult[]
+  transcriptSegments TranscriptSegment[]
+  downloadJobs DownloadJob[]
+}
+
+model ClipResult {
+  id          String   @id @default(cuid())
+  analysisId  String
+  title       String?  @db.Text
+  caption     String?  @db.Text
+  hashtags    String?  @db.Text
+  reason      String   @db.Text
+  startSecond Float
+  endSecond   Float
+  duration    Float
+  hookStart   Float?
+  hookEnd     Float?
+  hookReason  String?  @db.Text
+  transcript  String?  @db.LongText
+  score       Float?
+  filePath    String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  analysis Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  hooks    ClipHook[]
+  downloadJobs DownloadJob[]
+}
+
+model ClipHook {
+  id          String   @id @default(cuid())
+  clipId      String
+  title       String?  @db.Text
+  reason      String?  @db.Text
+  startSecond Float
+  endSecond   Float
+  duration    Float
+  filePath    String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clip ClipResult @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  downloadJobs DownloadJob[]
+}
+
+model TranscriptSegment {
+  id          String   @id @default(cuid())
+  analysisId  String
+  startSecond Float
+  endSecond   Float
+  text        String   @db.Text
+  createdAt   DateTime @default(now())
+
+  analysis Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+}
+
+model DownloadJob {
+  id          String            @id @default(cuid())
+  analysisId  String
+  clipId      String?
+  hookId      String?
+  type        DownloadJobType
+  mode        CutMode           @default(FAST)
+  burnSubtitle Boolean          @default(false)
+  status      DownloadJobStatus @default(PENDING)
+  progressText String?          @db.Text
+  errorMessage String?          @db.Text
+  filePath    String?           @db.Text
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  analysis Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  clip     ClipResult? @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  hook     ClipHook?   @relation(fields: [hookId], references: [id], onDelete: Cascade)
+}
+
+model ErrorLog {
+  id        String   @id @default(cuid())
+  scope     String
+  message   String   @db.Text
+  stack     String?  @db.LongText
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+enum AnalysisType {
+  LONG
+  SHORT
+}
+
+enum AnalysisMode {
+  HYBRID
+  FULL_AI
+}
+
+enum AnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum DownloadJobType {
+  CLIP
+  HOOK
+}
+
+enum CutMode {
+  FAST
+  PRECISE
+}
+
+enum DownloadJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}

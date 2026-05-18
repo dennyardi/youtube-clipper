@@ -1,0 +1,46 @@
+{
+  "name": "youtube-clipper-maker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "local:db": "docker compose up -d mysql phpmyadmin",
+    "local:setup": "prisma generate && prisma migrate dev && npm run prisma:seed",
+    "deploy:prepare": "prisma generate && prisma migrate deploy && npm run prisma:seed && next build"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.468.0",
+    "next": "^15.0.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "youtube-transcript": "^1.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.15.0",
+    "eslint-config-next": "^15.0.3",
+    "postcss": "^8.5.10",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.15",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
+  }
+}

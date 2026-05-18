@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: #172026;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(238, 243, 248, 0.96)),
+    #eef3f8;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+input,
+select,
+textarea {
+  outline: none;
+}
+
+.field {
+  @apply w-full rounded-md border border-line bg-white px-3 py-2.5 text-sm shadow-sm transition focus:border-brand focus:ring-2 focus:ring-blue-100;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+.btn-primary {
+  @apply bg-brand text-white hover:bg-blue-700;
+}
+
+.btn-muted {
+  @apply border border-line bg-white text-ink hover:bg-panel;
+}
+
+.btn-danger {
+  @apply bg-red-600 text-white hover:bg-red-700;
+}
