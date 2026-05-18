@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE `setting` ADD COLUMN `openaiApiKeyEnc` TEXT NULL;
+ALTER TABLE `Setting` ADD COLUMN `openaiApiKeyEnc` TEXT NULL;

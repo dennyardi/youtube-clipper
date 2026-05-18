@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE `clipresult` ADD COLUMN `caption` TEXT NULL,
+ALTER TABLE `ClipResult` ADD COLUMN `caption` TEXT NULL,
     ADD COLUMN `hashtags` TEXT NULL;
 
 -- CreateTable

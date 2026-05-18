@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE `analysis` ADD COLUMN `hookCount` INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE `Analysis` ADD COLUMN `hookCount` INTEGER NOT NULL DEFAULT 1;
 
 -- CreateTable
 CREATE TABLE `ClipHook` (
