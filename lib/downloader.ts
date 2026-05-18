@@ -3,16 +3,24 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { secondsToTimestamp } from "@/lib/time";
 
-function runCommand(command: string, args: string[]) {
+function runCommand(command: string, args: string[], timeoutMs = 20 * 60 * 1000) {
   return new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, { windowsHide: true });
     let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error(`${command} timeout setelah ${Math.round(timeoutMs / 1000)} detik.`));
+    }, timeoutMs);
 
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
     });
-    child.on("error", reject);
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
     child.on("close", (code) => {
+      clearTimeout(timer);
       if (code !== 0) reject(new Error(stderr || `${command} keluar dengan kode ${code}.`));
       else resolve();
     });
@@ -32,15 +40,30 @@ export async function downloadClip(args: {
   const ffmpeg = process.env.FFMPEG_EXE || "ffmpeg";
   const tmpDir = path.join(process.cwd(), "tmp");
   const downloadsDir = path.join(process.cwd(), "downloads");
+  const startSecond = Math.max(0, args.startSecond);
+  const endSecond = Math.max(startSecond + 1, args.endSecond);
+  const duration = endSecond - startSecond;
   await fs.mkdir(tmpDir, { recursive: true });
   await fs.mkdir(downloadsDir, { recursive: true });
 
   const inputPath = path.join(tmpDir, `${args.clipId}.source.%(ext)s`);
   const outputPath = path.join(downloadsDir, `${args.clipId}.mp4`);
+  const ytdlpFormat =
+    process.env.YTDLP_FORMAT ||
+    "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/best[height<=720]/best";
 
   await runCommand(ytdlp, [
     "-f",
-    "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+    ytdlpFormat,
+    "--no-playlist",
+    "--socket-timeout",
+    "30",
+    "--retries",
+    "2",
+    "--fragment-retries",
+    "2",
+    "--download-sections",
+    `*${startSecond}-${endSecond}`,
     "--merge-output-format",
     "mp4",
     "-o",
@@ -66,9 +89,9 @@ export async function downloadClip(args: {
     ffmpegArgs = [
       "-y",
       "-ss",
-      String(Math.max(0, args.startSecond)),
+      "0",
       "-to",
-      String(Math.max(args.startSecond, args.endSecond)),
+      String(duration),
       "-i",
       sourcePath,
       ...(subtitlePath ? ["-vf", `subtitles='${escapeSubtitlePath(subtitlePath)}'`] : []),
@@ -88,9 +111,9 @@ export async function downloadClip(args: {
     ffmpegArgs = [
       "-y",
       "-ss",
-      String(Math.max(0, args.startSecond)),
+      "0",
       "-to",
-      String(Math.max(args.startSecond, args.endSecond)),
+      String(duration),
       "-i",
       sourcePath,
       "-c",
@@ -99,7 +122,7 @@ export async function downloadClip(args: {
     ];
   }
 
-  await runCommand(ffmpeg, ffmpegArgs);
+  await runCommand(ffmpeg, ffmpegArgs, 10 * 60 * 1000);
 
   await fs.rm(sourcePath, { force: true });
   if (subtitlePath) await fs.rm(subtitlePath, { force: true });
