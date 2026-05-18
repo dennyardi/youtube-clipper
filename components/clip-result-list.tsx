@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Save } from "lucide-react";
+import { Download, Save, Trash2 } from "lucide-react";
 import { YoutubePreview } from "@/components/youtube-preview";
 import { secondsToClock } from "@/lib/time";
 
@@ -182,6 +182,27 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
     window.location.href = `/results/${data.analysisId}`;
   }
 
+  async function cleanupDownloads() {
+    const ok = window.confirm("Hapus semua file video tersimpan untuk analisa ini? Record analisa tetap disimpan.");
+    if (!ok) return;
+
+    setBusy("cleanup");
+    setDownloadStatus({ status: "PROCESSING", message: "Membersihkan file video tersimpan..." });
+    const response = await fetch(`/api/analysis/${analysisId}/cleanup-downloads`, { method: "POST" });
+    const data = await readJsonSafe(response);
+    setBusy(null);
+
+    if (!response.ok) {
+      setDownloadStatus({ status: "FAILED", message: "Gagal membersihkan file video.", error: data.error || "Cleanup gagal." });
+      return;
+    }
+
+    setDownloadStatus({
+      status: "COMPLETED",
+      message: `Cleanup selesai. ${data.removed || 0} file dihapus dari ${data.checked || 0} job.`,
+    });
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
@@ -201,6 +222,10 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-white p-4 shadow-soft">
         <button className="btn btn-primary" disabled={busy === analysisId} onClick={reanalyze}>
           Re-Analyze
+        </button>
+        <button className="btn btn-danger" disabled={busy === "cleanup"} onClick={cleanupDownloads}>
+          <Trash2 size={16} />
+          Bersihkan File Video
         </button>
         <label className="flex items-center gap-2 text-sm font-medium">
           Mode Cut
