@@ -1,11 +1,14 @@
 import fs from "node:fs";
 import { NextResponse } from "next/server";
+import { kickDownloadQueue, markStaleJobsFailed } from "@/lib/download-jobs";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const params = await context.params;
+  await markStaleJobsFailed();
+  await kickDownloadQueue();
   const job = await prisma.downloadJob.findUnique({ where: { id: params.id } });
   if (!job) return NextResponse.json({ error: "Download job tidak ditemukan." }, { status: 404 });
 

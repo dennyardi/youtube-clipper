@@ -4,6 +4,8 @@ import { getErrorMessage } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
+const STALE_JOB_MINUTES = 20;
+
 export async function createDownloadJob(args: {
   analysisId: string;
   clipId?: string;
@@ -25,8 +27,41 @@ export async function createDownloadJob(args: {
     },
   });
 
-  processDownloadJob(job.id).catch((error) => console.error(error));
+  kickDownloadQueue().catch((error) => console.error(error));
   return job;
+}
+
+export async function kickDownloadQueue() {
+  await markStaleJobsFailed();
+
+  const active = await prisma.downloadJob.findFirst({
+    where: { status: "PROCESSING" },
+    orderBy: { createdAt: "asc" },
+  });
+  if (active) return;
+
+  const next = await prisma.downloadJob.findFirst({
+    where: { status: "PENDING" },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!next) return;
+
+  processDownloadJob(next.id).catch((error) => console.error(error));
+}
+
+export async function markStaleJobsFailed() {
+  const staleDate = new Date(Date.now() - STALE_JOB_MINUTES * 60 * 1000);
+  await prisma.downloadJob.updateMany({
+    where: {
+      status: "PROCESSING",
+      updatedAt: { lt: staleDate },
+    },
+    data: {
+      status: "FAILED",
+      progressText: "Download gagal karena melewati batas waktu.",
+      errorMessage: `Job otomatis dihentikan setelah ${STALE_JOB_MINUTES} menit tanpa update.`,
+    },
+  });
 }
 
 export async function processDownloadJob(jobId: string) {
@@ -81,5 +116,7 @@ export async function processDownloadJob(jobId: string) {
       where: { id: job.id },
       data: { status: "FAILED", progressText: "Download gagal.", errorMessage: getErrorMessage(error) },
     });
+  } finally {
+    kickDownloadQueue().catch((error) => console.error(error));
   }
 }

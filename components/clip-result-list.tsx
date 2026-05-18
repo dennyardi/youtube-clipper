@@ -31,6 +31,13 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
   const [busy, setBusy] = useState<string | null>(null);
   const [cutMode, setCutMode] = useState<"FAST" | "PRECISE">("FAST");
   const [burnSubtitle, setBurnSubtitle] = useState(false);
+  const [downloadStatus, setDownloadStatus] = useState<{
+    jobId?: string;
+    target?: string;
+    status?: string;
+    message?: string;
+    error?: string;
+  } | null>(null);
   const totalDuration = items.reduce((sum, clip) => sum + Math.max(0, clip.endSecond - clip.startSecond), 0);
 
   async function updateClip(id: string, startSecond: number, endSecond: number) {
@@ -50,20 +57,33 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
   }
 
   async function waitForJob(jobId: string) {
+    setDownloadStatus({ jobId, status: "PENDING", message: "Download masuk antrean..." });
     for (let attempt = 0; attempt < 240; attempt += 1) {
       const response = await fetch(`/api/download-jobs/${jobId}`);
       const data = await response.json();
+      setDownloadStatus({
+        jobId,
+        status: data.status,
+        message: data.progressText || "Memproses download...",
+        error: data.errorMessage || null,
+      });
       if (data.status === "COMPLETED" && data.downloadUrl) {
+        setBusy(null);
         window.location.href = data.downloadUrl;
         return;
       }
       if (data.status === "FAILED") {
-        alert(data.errorMessage || "Download gagal.");
+        setBusy(null);
         return;
       }
       await new Promise((resolve) => window.setTimeout(resolve, 1500));
     }
-    alert("Download masih diproses. Cek lagi beberapa saat.");
+    setBusy(null);
+    setDownloadStatus({
+      jobId,
+      status: "PROCESSING",
+      message: "Download masih diproses. Cek lagi beberapa saat.",
+    });
   }
 
   async function downloadClip(id: string) {
@@ -74,9 +94,10 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
       body: JSON.stringify({ mode: cutMode, burnSubtitle }),
     });
     const data = await response.json();
-    setBusy(null);
 
     if (!response.ok) {
+      setBusy(null);
+      setDownloadStatus({ status: "FAILED", message: "Gagal membuat job download.", error: data.error || "Gagal mengunduh clip." });
       alert(data.error || "Gagal mengunduh clip.");
       return;
     }
@@ -94,15 +115,19 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
       body: JSON.stringify({ mode: cutMode, burnSubtitle }),
     });
     const data = await response.json();
-    setBusy(null);
 
     if (!response.ok) {
+      setBusy(null);
+      setDownloadStatus({ status: "FAILED", message: "Gagal membuat job download hook.", error: data.error || "Gagal mengunduh hook/teaser." });
       alert(data.error || "Gagal mengunduh hook/teaser.");
       return;
     }
 
     if (data.jobId) waitForJob(data.jobId);
-    else window.location.href = data.downloadUrl;
+    else {
+      setBusy(null);
+      window.location.href = data.downloadUrl;
+    }
   }
 
   async function reanalyze() {
@@ -149,6 +174,22 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
           Burn-in subtitle
         </label>
       </div>
+      {downloadStatus && (
+        <div
+          className={`rounded-lg border p-4 text-sm shadow-soft ${
+            downloadStatus.status === "FAILED"
+              ? "border-red-200 bg-red-50 text-red-700"
+              : downloadStatus.status === "COMPLETED"
+                ? "border-green-200 bg-green-50 text-green-700"
+                : "border-blue-200 bg-blue-50 text-blue-700"
+          }`}
+        >
+          <div className="font-semibold">Status Download: {downloadStatus.status || "PENDING"}</div>
+          <div className="mt-1">{downloadStatus.message}</div>
+          {downloadStatus.error && <div className="mt-1 font-medium">{downloadStatus.error}</div>}
+          {downloadStatus.jobId && <div className="mt-1 text-xs opacity-80">Job ID: {downloadStatus.jobId}</div>}
+        </div>
+      )}
       {items.map((clip, index) => (
         <div key={clip.id} className="grid gap-5 rounded-lg border border-line bg-white p-5 shadow-soft xl:grid-cols-[420px_minmax(0,1fr)]">
           <YoutubePreview videoId={videoId} start={clip.startSecond} end={clip.endSecond} />
