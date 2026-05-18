@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import fsp from "node:fs/promises";
 import path from "node:path";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -12,8 +13,10 @@ function s3Client() {
 
   return new S3Client({
     endpoint: process.env.S3_ENDPOINT,
-    region: process.env.S3_REGION || "auto",
+    region: process.env.S3_REGION || "us-east-1",
     forcePathStyle: String(process.env.S3_FORCE_PATH_STYLE || "true") === "true",
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
     credentials: {
       accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
@@ -32,24 +35,59 @@ export async function uploadDownloadToStorage(filePath: string, jobId: string) {
 
   const key = `downloads/${new Date().toISOString().slice(0, 10)}/${jobId}.mp4`;
   const body = fs.createReadStream(filePath);
+  const stat = await fsp.stat(filePath);
 
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: body,
-      ContentType: "video/mp4",
-      Metadata: {
-        source: "youtube-clipper-maker",
-      },
-    }),
-  );
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: body,
+        ContentLength: stat.size,
+        ContentType: "video/mp4",
+        Metadata: {
+          source: "youtube-clipper-maker",
+        },
+      }),
+    );
+  } catch (error) {
+    throw new Error(`S3 upload gagal: ${formatS3Error(error)}`);
+  }
 
   return {
     storageKey: key,
     storageBucket: bucket,
     storageProvider: "s3",
   };
+}
+
+function formatS3Error(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return String(error || "UnknownError");
+  }
+
+  const value = error as {
+    name?: string;
+    message?: string;
+    Code?: string;
+    code?: string;
+    $metadata?: {
+      httpStatusCode?: number;
+      requestId?: string;
+      extendedRequestId?: string;
+      attempts?: number;
+    };
+  };
+
+  return [
+    value.name || value.Code || value.code || "UnknownError",
+    value.message,
+    value.$metadata?.httpStatusCode ? `HTTP ${value.$metadata.httpStatusCode}` : "",
+    value.$metadata?.requestId ? `requestId=${value.$metadata.requestId}` : "",
+    value.$metadata?.attempts ? `attempts=${value.$metadata.attempts}` : "",
+  ]
+    .filter(Boolean)
+    .join(" | ");
 }
 
 export async function createSignedDownloadUrl(storageKey: string) {
