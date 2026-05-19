@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 function storageEnabled() {
@@ -38,8 +39,9 @@ export async function uploadDownloadToStorage(filePath: string, jobId: string) {
   const stat = await fsp.stat(filePath);
 
   try {
-    await client.send(
-      new PutObjectCommand({
+    const upload = new Upload({
+      client,
+      params: {
         Bucket: bucket,
         Key: key,
         Body: body,
@@ -48,8 +50,12 @@ export async function uploadDownloadToStorage(filePath: string, jobId: string) {
         Metadata: {
           source: "youtube-clipper-maker",
         },
-      }),
-    );
+      },
+      queueSize: Math.max(1, Number(process.env.S3_MULTIPART_QUEUE_SIZE || 2)),
+      partSize: Math.max(5 * 1024 * 1024, Number(process.env.S3_MULTIPART_PART_SIZE || 8 * 1024 * 1024)),
+      leavePartsOnError: false,
+    });
+    await upload.done();
   } catch (error) {
     throw new Error(`S3 upload gagal: ${formatS3Error(error)}`);
   }
