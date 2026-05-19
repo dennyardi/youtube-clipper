@@ -38,6 +38,8 @@ export async function downloadClip(args: {
 }) {
   const ytdlp = process.env.YTDLP_EXE || "yt-dlp";
   const ffmpeg = process.env.FFMPEG_EXE || "ffmpeg";
+  const ytdlpTimeoutMs = Number(process.env.YTDLP_TIMEOUT_MS || 20 * 60 * 1000);
+  const ffmpegTimeoutMs = Number(process.env.FFMPEG_TIMEOUT_MS || 10 * 60 * 1000);
   const tmpDir = path.join(process.cwd(), "tmp");
   const downloadsDir = path.join(process.cwd(), "downloads");
   const startSecond = Math.max(0, args.startSecond);
@@ -52,24 +54,28 @@ export async function downloadClip(args: {
     process.env.YTDLP_FORMAT ||
     "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/best[height<=720]/best";
 
-  await runCommand(ytdlp, [
-    "-f",
-    ytdlpFormat,
-    "--no-playlist",
-    "--socket-timeout",
-    "30",
-    "--retries",
-    "2",
-    "--fragment-retries",
-    "2",
-    "--download-sections",
-    `*${startSecond}-${endSecond}`,
-    "--merge-output-format",
-    "mp4",
-    "-o",
-    inputPath,
-    args.youtubeUrl,
-  ]);
+  await runCommand(
+    ytdlp,
+    [
+      "-f",
+      ytdlpFormat,
+      "--no-playlist",
+      "--socket-timeout",
+      "30",
+      "--retries",
+      "2",
+      "--fragment-retries",
+      "2",
+      "--download-sections",
+      `*${startSecond}-${endSecond}`,
+      "--merge-output-format",
+      "mp4",
+      "-o",
+      inputPath,
+      args.youtubeUrl,
+    ],
+    ytdlpTimeoutMs,
+  );
 
   const files = await fs.readdir(tmpDir);
   const sourceName = files.find((file) => file.startsWith(`${args.clipId}.source.`));
@@ -122,7 +128,7 @@ export async function downloadClip(args: {
     ];
   }
 
-  await runCommand(ffmpeg, ffmpegArgs, 10 * 60 * 1000);
+  await runCommand(ffmpeg, ffmpegArgs, ffmpegTimeoutMs);
 
   await fs.rm(sourcePath, { force: true });
   if (subtitlePath) await fs.rm(subtitlePath, { force: true });
