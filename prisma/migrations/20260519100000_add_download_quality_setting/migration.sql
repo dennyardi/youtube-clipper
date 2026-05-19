@@ -1,0 +1,1 @@
+ALTER TABLE `Setting` ADD COLUMN `downloadQuality` VARCHAR(191) NOT NULL DEFAULT '360';

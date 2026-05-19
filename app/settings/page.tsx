@@ -14,6 +14,7 @@ export default async function SettingsPage() {
         openaiModel: process.env.DEFAULT_OPENAI_MODEL || "gpt-5.2",
         analysisMode: "HYBRID",
         maxAiCandidates: Number(process.env.MAX_AI_CANDIDATES || 40),
+        downloadQuality: process.env.DEFAULT_DOWNLOAD_QUALITY || "360",
       },
     }));
 
@@ -28,6 +29,7 @@ export default async function SettingsPage() {
           openaiModel: setting.openaiModel,
           analysisMode: setting.analysisMode,
           maxAiCandidates: setting.maxAiCandidates,
+          downloadQuality: setting.downloadQuality,
           apiKeySource: decryptSecret(setting.openaiApiKeyEnc)
             ? `database: ${maskSecret(decryptSecret(setting.openaiApiKeyEnc))}`
             : process.env.OPENAI_API_KEY

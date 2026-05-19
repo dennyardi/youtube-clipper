@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { isObjectStorageEnabled, uploadDownloadToStorage } from "@/lib/storage";
 import fs from "node:fs/promises";
 
-const STALE_JOB_MINUTES = 20;
+const STALE_JOB_MINUTES = Number(process.env.DOWNLOAD_STALE_JOB_MINUTES || 180);
 
 export async function createDownloadJob(args: {
   analysisId: string;
@@ -90,6 +90,7 @@ export async function processDownloadJob(jobId: string) {
     const subtitles = job.analysis.transcriptSegments
       .filter((segment) => segment.endSecond >= startSecond && segment.startSecond <= endSecond)
       .map((segment) => ({ startSecond: segment.startSecond, endSecond: segment.endSecond, text: segment.text }));
+    const setting = await prisma.setting.findUnique({ where: { id: 1 } });
 
     const outputPath = await downloadClip({
       clipId: job.id,
@@ -99,6 +100,7 @@ export async function processDownloadJob(jobId: string) {
       mode: job.mode,
       burnSubtitle: job.burnSubtitle,
       subtitles,
+      downloadQuality: setting?.downloadQuality,
     });
 
     const storage = isObjectStorageEnabled() ? await uploadDownloadToStorage(outputPath, job.id) : null;

@@ -7,6 +7,7 @@ type Setting = {
   openaiModel: string;
   analysisMode: "HYBRID" | "FULL_AI";
   maxAiCandidates: number;
+  downloadQuality: string;
   apiKeySource: string;
 };
 
@@ -78,6 +79,18 @@ export function SettingsForm({ setting }: { setting: Setting }) {
             value={form.maxAiCandidates}
             onChange={(event) => setForm({ ...form, maxAiCandidates: Number(event.target.value) })}
           />
+        </label>
+
+        <label>
+          <span className="mb-1 block text-sm font-medium">Resolusi Download</span>
+          <select className="field" value={form.downloadQuality} onChange={(event) => setForm({ ...form, downloadQuality: event.target.value })}>
+            <option value="240">240p - paling ringan</option>
+            <option value="360">360p - rekomendasi video panjang</option>
+            <option value="480">480p - seimbang</option>
+            <option value="720">720p - lebih tajam</option>
+            <option value="audio-video-best">Best available - paling berat</option>
+          </select>
+          <span className="mt-1 block text-xs text-muted">Untuk clip 30 menit ke atas, 360p biasanya paling aman agar VPS tidak penuh dan tidak timeout.</span>
         </label>
       </div>
 

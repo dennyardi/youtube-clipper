@@ -35,6 +35,7 @@ export async function downloadClip(args: {
   mode?: "FAST" | "PRECISE";
   burnSubtitle?: boolean;
   subtitles?: Array<{ startSecond: number; endSecond: number; text: string }>;
+  downloadQuality?: string;
 }) {
   const ytdlp = process.env.YTDLP_EXE || "yt-dlp";
   const ffmpeg = process.env.FFMPEG_EXE || "ffmpeg";
@@ -50,9 +51,7 @@ export async function downloadClip(args: {
 
   const inputPath = path.join(tmpDir, `${args.clipId}.source.%(ext)s`);
   const outputPath = path.join(downloadsDir, `${args.clipId}.mp4`);
-  const ytdlpFormat =
-    process.env.YTDLP_FORMAT ||
-    "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/best[height<=720]/best";
+  const ytdlpFormat = process.env.YTDLP_FORMAT || getYtdlpFormat(args.downloadQuality);
 
   await runCommand(
     ytdlp,
@@ -147,4 +146,13 @@ function buildSrt(segments: Array<{ startSecond: number; endSecond: number; text
 
 function escapeSubtitlePath(filePath: string) {
   return filePath.replace(/\\/g, "/").replace(/:/g, "\\:");
+}
+
+function getYtdlpFormat(downloadQuality?: string) {
+  const quality = String(downloadQuality || "360").trim();
+  if (quality === "audio-video-best") return "bv*+ba/best";
+  if (quality === "720") return "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/best[height<=720]/best";
+  if (quality === "480") return "bv*[height<=480][ext=mp4]+ba[ext=m4a]/b[height<=480][ext=mp4]/best[height<=480]/best";
+  if (quality === "240") return "bv*[height<=240][ext=mp4]+ba[ext=m4a]/b[height<=240][ext=mp4]/best[height<=240]/best";
+  return "bv*[height<=360][ext=mp4]+ba[ext=m4a]/b[height<=360][ext=mp4]/best[height<=360]/best";
 }

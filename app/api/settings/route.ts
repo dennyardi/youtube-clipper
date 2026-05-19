@@ -16,6 +16,7 @@ export async function GET() {
         openaiModel: process.env.DEFAULT_OPENAI_MODEL || "gpt-5.2",
         analysisMode: "HYBRID",
         maxAiCandidates: Number(process.env.MAX_AI_CANDIDATES || 40),
+        downloadQuality: process.env.DEFAULT_DOWNLOAD_QUALITY || "360",
       },
     }));
 
@@ -25,6 +26,7 @@ export async function GET() {
     openaiModel: setting.openaiModel,
     analysisMode: setting.analysisMode,
     maxAiCandidates: setting.maxAiCandidates,
+    downloadQuality: setting.downloadQuality,
     apiKeySource: dbApiKey ? `database: ${maskSecret(dbApiKey)}` : process.env.OPENAI_API_KEY ? ".env configured" : "missing",
   });
 }
@@ -40,6 +42,7 @@ export async function PATCH(request: Request) {
         openaiModel: String(payload.openaiModel || "gpt-5.2").trim(),
         analysisMode,
         maxAiCandidates: Math.max(5, Math.min(100, Number(payload.maxAiCandidates || 40))),
+        downloadQuality: normalizeDownloadQuality(payload.downloadQuality),
         ...(openaiApiKey ? { openaiApiKeyEnc: encryptSecret(openaiApiKey) } : {}),
       },
       create: {
@@ -47,6 +50,7 @@ export async function PATCH(request: Request) {
         openaiModel: String(payload.openaiModel || "gpt-5.2").trim(),
         analysisMode,
         maxAiCandidates: Math.max(5, Math.min(100, Number(payload.maxAiCandidates || 40))),
+        downloadQuality: normalizeDownloadQuality(payload.downloadQuality),
         openaiApiKeyEnc: openaiApiKey ? encryptSecret(openaiApiKey) : null,
       },
     });
@@ -56,10 +60,16 @@ export async function PATCH(request: Request) {
       openaiModel: setting.openaiModel,
       analysisMode: setting.analysisMode,
       maxAiCandidates: setting.maxAiCandidates,
+      downloadQuality: setting.downloadQuality,
       apiKeySource: dbApiKey ? `database: ${maskSecret(dbApiKey)}` : process.env.OPENAI_API_KEY ? ".env configured" : "missing",
     });
   } catch (error) {
     await logError("api.settings.update", error);
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 400 });
   }
+}
+
+function normalizeDownloadQuality(value: unknown) {
+  const quality = String(value || "360");
+  return ["240", "360", "480", "720", "audio-video-best"].includes(quality) ? quality : "360";
 }

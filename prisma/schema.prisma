@@ -13,6 +13,7 @@ model Setting {
   openaiModel  String       @default("gpt-5.2")
   analysisMode AnalysisMode @default(HYBRID)
   maxAiCandidates Int       @default(40)
+  downloadQuality String    @default("360")
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
