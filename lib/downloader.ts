@@ -59,6 +59,7 @@ export async function downloadClip(args: {
       "-f",
       ytdlpFormat,
       "--no-playlist",
+      "--no-part",
       "--socket-timeout",
       "30",
       "--retries",
@@ -151,8 +152,19 @@ function escapeSubtitlePath(filePath: string) {
 function getYtdlpFormat(downloadQuality?: string) {
   const quality = String(downloadQuality || "360").trim();
   if (quality === "audio-video-best") return "bv*+ba/best";
-  if (quality === "720") return "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/best[height<=720]/best";
-  if (quality === "480") return "bv*[height<=480][ext=mp4]+ba[ext=m4a]/b[height<=480][ext=mp4]/best[height<=480]/best";
-  if (quality === "240") return "bv*[height<=240][ext=mp4]+ba[ext=m4a]/b[height<=240][ext=mp4]/best[height<=240]/best";
-  return "bv*[height<=360][ext=mp4]+ba[ext=m4a]/b[height<=360][ext=mp4]/best[height<=360]/best";
+  if (quality === "720") return formatForHeight(720);
+  if (quality === "480") return formatForHeight(480);
+  if (quality === "240") return formatForHeight(240);
+  return formatForHeight(360);
+}
+
+function formatForHeight(height: number) {
+  return [
+    `bv*[height<=${height}][ext=mp4][vcodec^=avc1]+ba[ext=m4a]`,
+    `b[height<=${height}][ext=mp4][vcodec^=avc1]`,
+    `bv*[height<=${height}][ext=mp4]+ba[ext=m4a]`,
+    `b[height<=${height}][ext=mp4]`,
+    `best[height<=${height}]`,
+    "best",
+  ].join("/");
 }
