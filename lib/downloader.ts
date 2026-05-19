@@ -49,9 +49,11 @@ export async function downloadClip(args: {
   await fs.mkdir(tmpDir, { recursive: true });
   await fs.mkdir(downloadsDir, { recursive: true });
 
-  const inputPath = path.join(tmpDir, `${args.clipId}.source.%(ext)s`);
+  const inputPath = path.join(tmpDir, `${args.clipId}.source.mp4`);
   const outputPath = path.join(downloadsDir, `${args.clipId}.mp4`);
   const ytdlpFormat = getYtdlpFormat(args.downloadQuality);
+  await fs.rm(inputPath, { force: true });
+  await fs.rm(outputPath, { force: true });
 
   await runCommand(
     ytdlp,
@@ -77,11 +79,12 @@ export async function downloadClip(args: {
     ytdlpTimeoutMs,
   );
 
-  const files = await fs.readdir(tmpDir);
-  const sourceName = files.find((file) => file.startsWith(`${args.clipId}.source.`));
-  if (!sourceName) throw new Error("File hasil yt-dlp tidak ditemukan.");
-
-  const sourcePath = path.join(tmpDir, sourceName);
+  const sourcePath = inputPath;
+  if (!(await fileExists(sourcePath))) {
+    const files = await fs.readdir(tmpDir);
+    const matchingFiles = files.filter((file) => file.includes(args.clipId));
+    throw new Error(`File hasil yt-dlp tidak ditemukan. File sementara terkait: ${matchingFiles.join(", ") || "tidak ada"}.`);
+  }
   const precise = args.mode === "PRECISE" || args.burnSubtitle;
   let subtitlePath: string | null = null;
   let ffmpegArgs: string[];
@@ -147,6 +150,15 @@ function buildSrt(segments: Array<{ startSecond: number; endSecond: number; text
 
 function escapeSubtitlePath(filePath: string) {
   return filePath.replace(/\\/g, "/").replace(/:/g, "\\:");
+}
+
+async function fileExists(filePath: string) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function getYtdlpFormat(downloadQuality?: string) {
