@@ -20,7 +20,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     progressText: job.progressText,
     errorMessage: job.errorMessage,
     downloadUrl:
-      job.status === "COMPLETED" && (job.storageKey || (job.filePath && fs.existsSync(job.filePath)))
+      job.status === "COMPLETED" && job.filePath && fs.existsSync(job.filePath)
         ? `/api/download-jobs/${job.id}/file`
         : null,
   });

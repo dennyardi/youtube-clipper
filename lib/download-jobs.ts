@@ -3,8 +3,6 @@ import { downloadClip } from "@/lib/downloader";
 import { getErrorMessage } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
-import { isObjectStorageEnabled, uploadDownloadToStorage } from "@/lib/storage";
-import fs from "node:fs/promises";
 
 const STALE_JOB_MINUTES = Number(process.env.DOWNLOAD_STALE_JOB_MINUTES || 180);
 
@@ -103,28 +101,23 @@ export async function processDownloadJob(jobId: string) {
       downloadQuality: setting?.downloadQuality,
     });
 
-    const storage = isObjectStorageEnabled() ? await uploadDownloadToStorage(outputPath, job.id) : null;
-    if (storage) {
-      await fs.rm(outputPath, { force: true });
-    }
-
     await prisma.downloadJob.update({
       where: { id: job.id },
       data: {
         status: "COMPLETED",
-        progressText: storage ? "Download selesai dan file sudah diupload ke object storage." : "Download selesai.",
-        filePath: storage ? null : outputPath,
-        storageKey: storage?.storageKey || null,
-        storageBucket: storage?.storageBucket || null,
-        storageProvider: storage?.storageProvider || null,
-        uploadedAt: storage ? new Date() : null,
+        progressText: "Download selesai dan tersimpan di komputer lokal.",
+        filePath: outputPath,
+        storageKey: null,
+        storageBucket: null,
+        storageProvider: null,
+        uploadedAt: null,
       },
     });
 
-    if (job.clipId && job.type === "CLIP" && !storage) {
+    if (job.clipId && job.type === "CLIP") {
       await prisma.clipResult.update({ where: { id: job.clipId }, data: { filePath: outputPath } });
     }
-    if (job.hookId && job.type === "HOOK" && !storage) {
+    if (job.hookId && job.type === "HOOK") {
       await prisma.clipHook.update({ where: { id: job.hookId }, data: { filePath: outputPath } });
     }
   } catch (error) {

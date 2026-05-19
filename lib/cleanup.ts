@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
-import { deleteStorageObject } from "@/lib/storage";
 
 const DEFAULT_MAX_AGE_HOURS = 24;
 
@@ -34,7 +33,7 @@ export async function cleanupExpiredDownloads(maxAgeHours = DEFAULT_MAX_AGE_HOUR
     if (await removeFileIfSafe(job.filePath)) removed += 1;
     await prisma.downloadJob.update({
       where: { id: job.id },
-      data: { filePath: null, progressText: "File lokal VPS otomatis dibersihkan setelah 24 jam." },
+      data: { filePath: null, progressText: "File lokal otomatis dibersihkan setelah 24 jam." },
     });
   }
 
@@ -58,7 +57,6 @@ export async function cleanupAnalysisDownloads(analysisId: string) {
   let removed = 0;
   for (const job of jobs) {
     if (await removeFileIfSafe(job.filePath)) removed += 1;
-    if (job.storageKey && (await deleteStorageObject(job.storageKey))) removed += 1;
   }
 
   await prisma.downloadJob.updateMany({
