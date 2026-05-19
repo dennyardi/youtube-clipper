@@ -51,7 +51,7 @@ export async function downloadClip(args: {
 
   const inputPath = path.join(tmpDir, `${args.clipId}.source.%(ext)s`);
   const outputPath = path.join(downloadsDir, `${args.clipId}.mp4`);
-  const ytdlpFormat = process.env.YTDLP_FORMAT || getYtdlpFormat(args.downloadQuality);
+  const ytdlpFormat = getYtdlpFormat(args.downloadQuality);
 
   await runCommand(
     ytdlp,
