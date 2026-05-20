@@ -52,6 +52,8 @@ export async function downloadClip(args: {
   const inputPath = path.join(tmpDir, `${args.clipId}.source.mp4`);
   const outputPath = path.join(downloadsDir, `${args.clipId}.mp4`);
   const ytdlpFormat = getYtdlpFormat(args.downloadQuality);
+  const cookiesArgs = await getCookiesArgs();
+  const jsRuntimeArgs = getJsRuntimeArgs();
   await fs.rm(inputPath, { force: true });
   await fs.rm(outputPath, { force: true });
 
@@ -68,6 +70,8 @@ export async function downloadClip(args: {
       "2",
       "--fragment-retries",
       "2",
+      ...cookiesArgs,
+      ...jsRuntimeArgs,
       "--download-sections",
       `*${startSecond}-${endSecond}`,
       "--merge-output-format",
@@ -159,6 +163,20 @@ async function fileExists(filePath: string) {
   } catch {
     return false;
   }
+}
+
+async function getCookiesArgs() {
+  const cookiesFile = process.env.YTDLP_COOKIES_FILE?.trim();
+  if (!cookiesFile) return [];
+  if (!(await fileExists(cookiesFile))) {
+    throw new Error(`File cookies yt-dlp tidak ditemukan: ${cookiesFile}`);
+  }
+  return ["--cookies", cookiesFile];
+}
+
+function getJsRuntimeArgs() {
+  const runtime = process.env.YTDLP_JS_RUNTIME?.trim();
+  return runtime ? ["--js-runtimes", runtime] : [];
 }
 
 function getYtdlpFormat(downloadQuality?: string) {
