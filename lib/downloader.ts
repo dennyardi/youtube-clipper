@@ -54,6 +54,7 @@ export async function downloadClip(args: {
   const ytdlpFormat = getYtdlpFormat(args.downloadQuality);
   const cookiesArgs = await getCookiesArgs();
   const jsRuntimeArgs = getJsRuntimeArgs();
+  const remoteComponentArgs = getRemoteComponentArgs();
   await fs.rm(inputPath, { force: true });
   await fs.rm(outputPath, { force: true });
 
@@ -72,6 +73,7 @@ export async function downloadClip(args: {
       "2",
       ...cookiesArgs,
       ...jsRuntimeArgs,
+      ...remoteComponentArgs,
       "--download-sections",
       `*${startSecond}-${endSecond}`,
       "--merge-output-format",
@@ -177,6 +179,15 @@ async function getCookiesArgs() {
 function getJsRuntimeArgs() {
   const runtime = process.env.YTDLP_JS_RUNTIME?.trim();
   return runtime ? ["--js-runtimes", runtime] : [];
+}
+
+function getRemoteComponentArgs() {
+  const components = (process.env.YTDLP_REMOTE_COMPONENTS || "")
+    .split(",")
+    .map((component) => component.trim())
+    .filter(Boolean);
+
+  return components.flatMap((component) => ["--remote-components", component]);
 }
 
 function getYtdlpFormat(downloadQuality?: string) {
