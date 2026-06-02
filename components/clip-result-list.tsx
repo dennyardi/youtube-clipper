@@ -1,5 +1,6 @@
 "use client";
 
+import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useState } from "react";
 import { Clipboard, Download, Save, Trash2 } from "lucide-react";
 import { YoutubePreview } from "@/components/youtube-preview";
@@ -26,15 +27,24 @@ type Clip = {
   }>;
 };
 
+type Segment = {
+  id: string;
+  startSecond: number;
+  endSecond: number;
+  text: string;
+};
+
 export function ClipResultList({
   analysisId,
   videoId,
   clips,
+  segments = [],
   showTimestamps = false,
 }: {
   analysisId: string;
   videoId: string;
   clips: Clip[];
+  segments?: Segment[];
   showTimestamps?: boolean;
 }) {
   const [items, setItems] = useState(clips);
@@ -59,7 +69,6 @@ export function ClipResultList({
     downloadUrl: string | null;
   }>>([]);
   const totalDuration = items.reduce((sum, clip) => sum + Math.max(0, clip.endSecond - clip.startSecond), 0);
-  const youtubeTimestamps = buildYoutubeTimestamps(items);
 
   useEffect(() => {
     let stopped = false;
@@ -215,10 +224,10 @@ export function ClipResultList({
     });
   }
 
-  async function copyTimestamps() {
-    if (!youtubeTimestamps) return;
+  async function copyTimestamps(text: string) {
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(youtubeTimestamps);
+      await navigator.clipboard.writeText(text);
       setCopyMessage("Timestamp berhasil disalin.");
     } catch {
       setCopyMessage("Gagal menyalin timestamp.");
@@ -262,24 +271,6 @@ export function ClipResultList({
           Burn-in subtitle
         </label>
       </div>
-      {showTimestamps && youtubeTimestamps && (
-        <div className="rounded-lg border border-line bg-white p-5 shadow-soft">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold uppercase tracking-wide text-brand">Timestamp YouTube</div>
-              <div className="mt-1 text-sm text-muted">Dibuat dari clip pilihan AI dan mengikuti start time terbaru.</div>
-            </div>
-            <button className="btn btn-muted" onClick={copyTimestamps}>
-              <Clipboard size={16} />
-              Copy Timestamp
-            </button>
-          </div>
-          <pre className="mt-4 max-h-72 overflow-auto rounded-md border border-line bg-panel p-4 text-sm leading-6 text-ink whitespace-pre-wrap">
-            {youtubeTimestamps}
-          </pre>
-          {copyMessage && <div className="mt-3 rounded-md border border-line bg-panel px-3 py-2 text-sm">{copyMessage}</div>}
-        </div>
-      )}
       {downloadStatus && (
         <div
           className={`rounded-lg border p-4 text-sm shadow-soft ${
@@ -321,9 +312,59 @@ export function ClipResultList({
         </div>
       )}
       {items.map((clip, index) => (
-        <div key={clip.id} className="grid gap-5 rounded-lg border border-line bg-white p-5 shadow-soft xl:grid-cols-[420px_minmax(0,1fr)]">
-          <YoutubePreview videoId={videoId} start={clip.startSecond} end={clip.endSecond} />
-          <div>
+        <ClipResultCard
+          key={clip.id}
+          clip={clip}
+          index={index}
+          videoId={videoId}
+          busy={busy}
+          showTimestamps={showTimestamps}
+          segments={segments}
+          onCopyTimestamps={copyTimestamps}
+          copyMessage={copyMessage}
+          onUpdateClip={updateClip}
+          onSetItems={setItems}
+          onDownloadClip={downloadClip}
+          onDownloadHook={downloadHook}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ClipResultCard({
+  clip,
+  index,
+  videoId,
+  busy,
+  showTimestamps,
+  segments,
+  copyMessage,
+  onCopyTimestamps,
+  onUpdateClip,
+  onSetItems,
+  onDownloadClip,
+  onDownloadHook,
+}: {
+  clip: Clip;
+  index: number;
+  videoId: string;
+  busy: string | null;
+  showTimestamps: boolean;
+  segments: Segment[];
+  copyMessage: string | null;
+  onCopyTimestamps: (text: string) => void;
+  onUpdateClip: (id: string, startSecond: number, endSecond: number) => void;
+  onSetItems: Dispatch<SetStateAction<Clip[]>>;
+  onDownloadClip: (id: string) => void;
+  onDownloadHook: (id: string) => void;
+}) {
+  const clipTimestamps = showTimestamps ? buildClipTimestamps(clip, segments) : "";
+
+  return (
+    <div className="grid gap-5 rounded-lg border border-line bg-white p-5 shadow-soft xl:grid-cols-[420px_minmax(0,1fr)]">
+      <YoutubePreview videoId={videoId} start={clip.startSecond} end={clip.endSecond} />
+      <div>
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-brand">Clip {index + 1}</div>
             <h2 className="text-xl font-semibold">{clip.title || "Clip pilihan"}</h2>
             <div className="mt-2 flex flex-wrap gap-2 text-xs font-medium text-muted">
@@ -342,6 +383,25 @@ export function ClipResultList({
               <div className="mt-3 rounded-md border border-line bg-panel px-3 py-2 text-sm">
                 {clip.caption && <div className="leading-6">{clip.caption}</div>}
                 {clip.hashtags && <div className="mt-2 font-medium text-brand">{clip.hashtags}</div>}
+              </div>
+            )}
+
+            {showTimestamps && clipTimestamps && (
+              <div className="mt-3 rounded-md border border-line bg-panel px-3 py-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="font-medium">Timestamp untuk Clip {index + 1}</div>
+                    <div className="mt-1 text-xs text-muted">Timestamp relatif dari awal file clip yang akan diupload.</div>
+                  </div>
+                  <button className="btn btn-muted py-1.5" onClick={() => onCopyTimestamps(clipTimestamps)}>
+                    <Clipboard size={14} />
+                    Copy
+                  </button>
+                </div>
+                <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-line bg-white p-3 leading-6 text-ink">
+                  {clipTimestamps}
+                </pre>
+                {copyMessage && <div className="mt-2 text-xs font-medium text-brand">{copyMessage}</div>}
               </div>
             )}
 
@@ -367,7 +427,7 @@ export function ClipResultList({
                         <div className="font-medium">
                           {hook.title || `Hook ${hookIndex + 1}`}: {secondsToClock(hook.startSecond)} - {secondsToClock(hook.endSecond)}
                         </div>
-                        <button className="btn btn-muted py-1.5" disabled={busy === hook.id} onClick={() => downloadHook(hook.id)}>
+                        <button className="btn btn-muted py-1.5" disabled={busy === hook.id} onClick={() => onDownloadHook(hook.id)}>
                           <Download size={14} />
                           Download Hook
                         </button>
@@ -388,7 +448,7 @@ export function ClipResultList({
                   defaultValue={Math.round(clip.startSecond)}
                   onChange={(event) => {
                     const value = Number(event.target.value);
-                    setItems((current) => current.map((item) => (item.id === clip.id ? { ...item, startSecond: value } : item)));
+                    onSetItems((current) => current.map((item) => (item.id === clip.id ? { ...item, startSecond: value } : item)));
                   }}
                 />
               </label>
@@ -400,37 +460,54 @@ export function ClipResultList({
                   defaultValue={Math.round(clip.endSecond)}
                   onChange={(event) => {
                     const value = Number(event.target.value);
-                    setItems((current) => current.map((item) => (item.id === clip.id ? { ...item, endSecond: value } : item)));
+                    onSetItems((current) => current.map((item) => (item.id === clip.id ? { ...item, endSecond: value } : item)));
                   }}
                 />
               </label>
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <button className="btn btn-muted" disabled={busy === clip.id} onClick={() => updateClip(clip.id, clip.startSecond, clip.endSecond)}>
+              <button className="btn btn-muted" disabled={busy === clip.id} onClick={() => onUpdateClip(clip.id, clip.startSecond, clip.endSecond)}>
                 <Save size={16} />
                 Simpan Time
               </button>
-              <button className="btn btn-primary" disabled={busy === clip.id} onClick={() => downloadClip(clip.id)}>
+              <button className="btn btn-primary" disabled={busy === clip.id} onClick={() => onDownloadClip(clip.id)}>
                 <Download size={16} />
                 Download Clip
               </button>
             </div>
           </div>
         </div>
-      ))}
-    </div>
   );
 }
 
-function buildYoutubeTimestamps(clips: Clip[]) {
-  return clips
-    .slice()
-    .sort((left, right) => left.startSecond - right.startSecond)
-    .map((clip, index) => {
-      const label = normalizeTimestampLabel(clip.title || clip.caption || clip.reason || `Clip ${index + 1}`);
-      return `${secondsToClock(clip.startSecond)} ${label}`;
-    })
+function buildClipTimestamps(clip: Clip, segments: Segment[]) {
+  const clipSegments = segments.filter((segment) => segment.endSecond >= clip.startSecond && segment.startSecond <= clip.endSecond);
+  if (!clipSegments.length) {
+    return `0:00 ${normalizeTimestampLabel(clip.title || clip.reason || "Awal pembahasan")}`;
+  }
+
+  const minGapSeconds = Math.max(30, Math.min(90, Math.round((clip.endSecond - clip.startSecond) / 4)));
+  const markers: Array<{ second: number; label: string }> = [];
+
+  for (const segment of clipSegments) {
+    const relativeSecond = Math.max(0, segment.startSecond - clip.startSecond);
+    const previous = markers[markers.length - 1];
+    if (!previous || relativeSecond - previous.second >= minGapSeconds) {
+      markers.push({
+        second: relativeSecond,
+        label: normalizeTimestampLabel(segment.text),
+      });
+    }
+  }
+
+  if (markers[0]?.second !== 0) {
+    markers.unshift({ second: 0, label: normalizeTimestampLabel(clip.title || clip.reason || clipSegments[0].text) });
+  }
+
+  return markers
+    .slice(0, 8)
+    .map((marker) => `${secondsToClock(marker.second)} ${marker.label}`)
     .join("\n");
 }
 
