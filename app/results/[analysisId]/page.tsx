@@ -31,7 +31,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ analys
           <p className="text-sm leading-6 text-muted">{analysis.nicheAnalysis}</p>
         </div>
       )}
-      <ClipResultList analysisId={analysis.id} videoId={analysis.videoId} clips={analysis.clips} />
+      <ClipResultList analysisId={analysis.id} videoId={analysis.videoId} clips={analysis.clips} showTimestamps={analysis.type === "LONG"} />
       <TranscriptTimeline clips={analysis.clips} segments={analysis.transcriptSegments} />
     </>
   );

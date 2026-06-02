@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Save, Trash2 } from "lucide-react";
+import { Clipboard, Download, Save, Trash2 } from "lucide-react";
 import { YoutubePreview } from "@/components/youtube-preview";
 import { secondsToClock } from "@/lib/time";
 
@@ -26,11 +26,22 @@ type Clip = {
   }>;
 };
 
-export function ClipResultList({ analysisId, videoId, clips }: { analysisId: string; videoId: string; clips: Clip[] }) {
+export function ClipResultList({
+  analysisId,
+  videoId,
+  clips,
+  showTimestamps = false,
+}: {
+  analysisId: string;
+  videoId: string;
+  clips: Clip[];
+  showTimestamps?: boolean;
+}) {
   const [items, setItems] = useState(clips);
   const [busy, setBusy] = useState<string | null>(null);
   const [cutMode, setCutMode] = useState<"FAST" | "PRECISE">("FAST");
   const [burnSubtitle, setBurnSubtitle] = useState(false);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const [downloadStatus, setDownloadStatus] = useState<{
     jobId?: string;
     target?: string;
@@ -48,6 +59,7 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
     downloadUrl: string | null;
   }>>([]);
   const totalDuration = items.reduce((sum, clip) => sum + Math.max(0, clip.endSecond - clip.startSecond), 0);
+  const youtubeTimestamps = buildYoutubeTimestamps(items);
 
   useEffect(() => {
     let stopped = false;
@@ -203,6 +215,17 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
     });
   }
 
+  async function copyTimestamps() {
+    if (!youtubeTimestamps) return;
+    try {
+      await navigator.clipboard.writeText(youtubeTimestamps);
+      setCopyMessage("Timestamp berhasil disalin.");
+    } catch {
+      setCopyMessage("Gagal menyalin timestamp.");
+    }
+    window.setTimeout(() => setCopyMessage(null), 2500);
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
@@ -239,6 +262,24 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
           Burn-in subtitle
         </label>
       </div>
+      {showTimestamps && youtubeTimestamps && (
+        <div className="rounded-lg border border-line bg-white p-5 shadow-soft">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-wide text-brand">Timestamp YouTube</div>
+              <div className="mt-1 text-sm text-muted">Dibuat dari clip pilihan AI dan mengikuti start time terbaru.</div>
+            </div>
+            <button className="btn btn-muted" onClick={copyTimestamps}>
+              <Clipboard size={16} />
+              Copy Timestamp
+            </button>
+          </div>
+          <pre className="mt-4 max-h-72 overflow-auto rounded-md border border-line bg-panel p-4 text-sm leading-6 text-ink whitespace-pre-wrap">
+            {youtubeTimestamps}
+          </pre>
+          {copyMessage && <div className="mt-3 rounded-md border border-line bg-panel px-3 py-2 text-sm">{copyMessage}</div>}
+        </div>
+      )}
       {downloadStatus && (
         <div
           className={`rounded-lg border p-4 text-sm shadow-soft ${
@@ -380,4 +421,23 @@ export function ClipResultList({ analysisId, videoId, clips }: { analysisId: str
       ))}
     </div>
   );
+}
+
+function buildYoutubeTimestamps(clips: Clip[]) {
+  return clips
+    .slice()
+    .sort((left, right) => left.startSecond - right.startSecond)
+    .map((clip, index) => {
+      const label = normalizeTimestampLabel(clip.title || clip.caption || clip.reason || `Clip ${index + 1}`);
+      return `${secondsToClock(clip.startSecond)} ${label}`;
+    })
+    .join("\n");
+}
+
+function normalizeTimestampLabel(value: string) {
+  return value
+    .replace(/\s+/g, " ")
+    .replace(/[#*_`~]/g, "")
+    .trim()
+    .slice(0, 90);
 }
